@@ -1,0 +1,44 @@
+{
+  "name": "bigint-decimal",
+  "version": "1.0.1",
+  "description": "A zero-dependency, arbitrary-precision decimal math library using native BigInt for safe financial and crypto calculations.",
+  "main": "./dist/global/index.js",
+  "author": "soso tsertsvadze",
+  "license": "MIT",
+  "scripts": {
+    "test": "jest",
+    "dev": "tsc -w --project tsconfig.common.json & tsc -w --project tsconfig.global.json & node --watch --watch-preserve-output ./dist/common/index.js & wait",
+    "build": "tsc --project tsconfig.common.json && tsc --project tsconfig.global.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Generalsimus/bigint-decimal.git"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/global/index.js",
+      "require": "./dist/common/index.js"
+    }
+  },
+  "keywords": [
+    "bigint",
+    "decimal",
+    "math",
+    "number",
+    "finance",
+    "crypto",
+    "precision",
+    "arbitrary-precision",
+    "typescript",
+    "bignumber"
+  ],
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6"
+  }
+}

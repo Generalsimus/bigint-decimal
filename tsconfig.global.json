@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.base",
+    "compilerOptions":{
+        "declarationDir": "./dist/global",
+        "outDir":"./dist/global",
+        "module":  "ESNext"
+    }
+}
