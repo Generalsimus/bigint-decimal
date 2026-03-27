@@ -1,22 +1,28 @@
 {
+  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    "moduleResolution": "node",
-    "noImplicitAny": true,
-    "removeComments": false,
-    "preserveConstEnums": true,
+    // File Layout 
+    "outDir": "./dist",
+    "module": "esnext",
+    "target": "esnext",
     "sourceMap": true,
     "declaration": true,
-    "target": "ES2020",
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "rootDir": "./",
-    "declarationDir": "./dist",
-    "outDir": "./dist",
+    "declarationMap": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
     "strict": true,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
   },
   "exclude": [
     "./dist/",
     "node_modules",
     "./test"
-  ]
+  ],
+  "include": [
+    "./**/*"
+  ],
 }

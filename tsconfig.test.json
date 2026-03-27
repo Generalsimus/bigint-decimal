@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.base",
+    "compilerOptions": {
+        "declarationDir": "./dist/test",
+        "outDir": "./dist/test",
+        "module": "nodenext",
+    },
+    "include": [
+        "./test/**/*.ts"
+    ],
+    "exclude": []
+}

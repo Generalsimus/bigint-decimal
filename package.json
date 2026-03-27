@@ -9,7 +9,7 @@
     "clean": "rm -rf dist",
     "build": "npm run clean && tsc --project tsconfig.common.json && tsc --project tsconfig.global.json",
     "dev": "tsc -w --project tsconfig.common.json & tsc -w --project tsconfig.global.json & node --watch --watch-preserve-output ./dist/common/index.js",
-    "test": "jest",
+    "test": "tsc --project tsconfig.test.json &&   jest ./dist/test && rm -rf ./dist/test",
     "prepublishOnly": "npm run test && npm run build"
   },
   "publishConfig": {
@@ -40,8 +40,8 @@
     "bignumber"
   ],
   "devDependencies": {
-    "@types/jest": "^30.0.0",
     "jest": "^30.3.0",
-    "ts-jest": "^29.4.6"
+    "typescript": "^6.0.2",
+    "@jest/types": "^30.3.0"
   }
 }
