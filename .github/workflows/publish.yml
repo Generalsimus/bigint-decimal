@@ -54,7 +54,14 @@ jobs:
           git tag -a "$TAG" -m "chore(release): $NEXT_VERSION [skip ci]"
 
       - name: Publish with Trusted Publishing
-        run: npm publish --provenance --access public
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version 2>/dev/null | grep -qF "$PKG_VERSION"; then
+            echo "Version $PKG_VERSION already published, skipping"
+          else
+            npm publish --provenance --access public
+          fi
 
       - name: Push version + tags
         run: git push --follow-tags
