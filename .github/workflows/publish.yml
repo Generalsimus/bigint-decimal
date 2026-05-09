@@ -7,6 +7,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'chore(release)')"
 
     permissions:
       contents: write
@@ -15,6 +16,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -39,31 +43,27 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Compute next version and tag
+      - name: Bump version (patch)
         run: |
-          PKG_NAME=$(node -p "require('./package.json').name")
-          # Use npm registry as source of truth so we never re-bump an already-published version
-          CURRENT=$(npm view "$PKG_NAME" version 2>/dev/null || node -p "require('./package.json').version")
-          NEXT=$(node -p "const [ma,mi,pa]='${CURRENT}'.split('.').map(Number); \`\${ma}.\${mi}.\${pa+1}\`")
-          TAG="v${NEXT}"
-          # Update package.json locally (no commit — avoids pushing to protected main)
-          npm version "$NEXT" --no-git-tag-version --allow-same-version 2>/dev/null || \
-          npm version "$NEXT" --no-git-tag-version
+          # npm outputs "v1.0.13" (with v prefix already)
+          TAG=$(npm version patch --no-git-tag-version)
+          VERSION="${TAG#v}"
+          git add package.json package-lock.json
           # Remove stale tag from a previous failed run if it exists
           git tag -d "$TAG" 2>/dev/null || true
           git push origin ":refs/tags/$TAG" 2>/dev/null || true
-          git tag -a "$TAG" -m "chore(release): $NEXT"
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-          echo "VERSION=$NEXT" >> "$GITHUB_ENV"
+          git commit -m "chore(release): $VERSION [skip ci]"
+          git tag -a "$TAG" -m "chore(release): $VERSION [skip ci]"
 
       - name: Publish with Trusted Publishing
         run: |
           PKG_NAME=$(node -p "require('./package.json').name")
-          if npm view "${PKG_NAME}@${VERSION}" version 2>/dev/null | grep -qF "$VERSION"; then
-            echo "Version $VERSION already published, skipping"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version 2>/dev/null | grep -qF "$PKG_VERSION"; then
+            echo "Version $PKG_VERSION already published, skipping"
           else
             npm publish --provenance --access public
           fi
 
-      - name: Push tag
-        run: git push origin "$TAG"
+      - name: Push version + tags
+        run: git push --follow-tags
