@@ -3,7 +3,6 @@ name: Test BigintDecimal
 on:
   pull_request:
     branches: [ "main", "master" ]
-    types: [ opened ]
 
 jobs:
   test:
