@@ -44,7 +44,14 @@ jobs:
 
       - name: Bump version (patch)
         run: |
-          npm version patch -m "chore(release): %s [skip ci]"
+          NEXT_VERSION=$(npm version patch --no-git-tag-version)
+          TAG="v${NEXT_VERSION}"
+          git add package.json package-lock.json
+          # Remove stale tag from a previous failed run if it exists
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          git commit -m "chore(release): $NEXT_VERSION [skip ci]"
+          git tag -a "$TAG" -m "chore(release): $NEXT_VERSION [skip ci]"
 
       - name: Publish with Trusted Publishing
         run: npm publish --provenance --access public
