@@ -4,6 +4,7 @@
         "declarationDir": "./dist/test",
         "outDir": "./dist/test",
         "module": "nodenext",
+        "types": ["node"],
     },
     "include": [
         "./test/**/*.ts"

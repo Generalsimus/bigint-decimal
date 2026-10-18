@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
+import { inspect } from "node:util";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { BigintDecimal } from '../index';
+import { BigintDecimalBase } from '../bigintDecimalBase';
 
 describe('BigintDecimal', () => {
   describe('Initialization & Parsing', () => {
@@ -232,5 +236,193 @@ describe('BigintDecimal', () => {
       // JSON.stringify automatically calls .toJSON() on the class
       expect(JSON.stringify(payload)).toBe('{"id":1,"balance":"1500.55"}');
     });
+  });
+});
+describe('BigintDecimalBase and subclasses', () => {
+  it('arithmetic returns the class it was called on', () => {
+    const x = new BigintDecimal("1.5");
+    for (const result of [x.plus(1), x.minus(1), x.times(2), x.div(3), x.round(0)]) {
+      expect(result).toBeInstanceOf(BigintDecimal);
+    }
+    // so the result can go straight into the Math functions
+    expect(BigintDecimal.sqrt(x.times(6)).toString()).toBe("3");
+
+    const base = new BigintDecimalBase("1.5");
+    expect(base.plus(1)).toBeInstanceOf(BigintDecimalBase);
+    expect(base.plus(1)).not.toBeInstanceOf(BigintDecimal);
+  });
+
+  it('setPrecisionGlobal is shared by the base class and subclasses', () => {
+    BigintDecimal.setPrecisionGlobal(3);
+    expect(new BigintDecimalBase(1).div(3).toString()).toBe("0.333");
+    expect(new BigintDecimal(1).div(3).toString()).toBe("0.333");
+    expect(BigintDecimal.sqrt(2).toString()).toBe("1.414");
+
+    BigintDecimalBase.setPrecisionGlobal(5);
+    expect(new BigintDecimal(1).div(3).toString()).toBe("0.33333");
+    expect(BigintDecimal.sqrt(2).toString()).toBe("1.41421");
+
+    BigintDecimal.setPrecisionGlobal(20);
+  });
+
+  it('parses huge strings exactly and quickly', () => {
+    const digits = "1234567891".repeat(20000); // 200,000 digits, no trailing zero to trim
+    const start = performance.now();
+    const x = new BigintDecimal(`-${digits}.${digits}`);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(x.toString()).toBe(`-${digits}.${digits}`);
+    expect(new BigintDecimal(`${digits}e-100000`).toString()).toBe(`${digits.slice(0, -100000)}.${digits.slice(-100000)}`.replace(/0+$/, ""));
+  });
+
+  it('integer inputs take the fast path with the same results', () => {
+    expect(new BigintDecimal(123456789012345678901234567890n).toString()).toBe("123456789012345678901234567890");
+    expect(new BigintDecimal(-42).toString()).toBe("-42");
+    expect(new BigintDecimal(-0).toString()).toBe("0");
+    expect(new BigintDecimal(Number.MAX_SAFE_INTEGER).toString()).toBe("9007199254740991");
+    // unsafe numbers still use their shortest decimal form, as before
+    expect(new BigintDecimal(1e23).toString()).toBe("100000000000000000000000");
+    expect(new BigintDecimal(0.1 + 0.2).toString()).toBe("0.30000000000000004");
+  });
+});
+
+describe('Input validation: every accepted and rejected form', () => {
+  const accepted: [input: string | number | bigint, expected: string][] = [
+    ["0", "0"], ["-0", "0"], ["+0", "0"], ["007", "7"], ["00012.3400", "12.34"],
+    [".5", "0.5"], ["-.5", "-0.5"], ["+.5", "0.5"], ["5.", "5"], ["-5.", "-5"],
+    ["1e3", "1000"], ["1E3", "1000"], ["1e+3", "1000"], ["1e-3", "0.001"], ["1e0", "1"], ["1e-0", "1"], ["1e+05", "100000"],
+    ["1.5e2", "150"], ["-2.5e-3", "-0.0025"], [".5e1", "5"], ["5.e1", "50"], ["0e10", "0"], ["-0.0e-0", "0"],
+    ["123e-5", "0.00123"], ["1e-30", "0.000000000000000000000000000001"],
+    [" 12 ", "12"], ["\t7\n", "7"],
+    [0, "0"], [-0, "0"], [42, "42"], [-12.5, "-12.5"], [1e21, "1000000000000000000000"], [1e-7, "0.0000001"],
+    [0n, "0"], [-5n, "-5"], [10n ** 30n, "1000000000000000000000000000000"],
+  ];
+  it.each(accepted)('accepts %p as %s', (input, expected) => {
+    expect(new BigintDecimal(input).toString()).toBe(expected);
+  });
+
+  const rejected: (string | number)[] = [
+    "", " ", "-", "+", ".", "-.", "+.", "e", "e5", "-e5", ".e1", "1e", "1e-", "1e+", "1E",
+    "1.2.3", "1..2", "1e5e5", "1e5.5", "1e.5", "--1", "+-1", "-+1", "1-", "1+1", "1 2", "1_000", "0x10", "abc", "1a", "a1",
+    "Infinity", "-Infinity", "NaN", NaN, Infinity, -Infinity,
+  ];
+  it.each(rejected)('rejects %p', (input) => {
+    expect(() => new BigintDecimal(input)).toThrow('is not safe parameter');
+  });
+
+  it('defaults to zero', () => {
+    expect(new BigintDecimal().toString()).toBe("0");
+    expect(new BigintDecimalBase().toString()).toBe("0");
+  });
+
+  it('shows as a plain number in console.log / util.inspect', () => {
+    expect(inspect(new BigintDecimal("-12.50"))).toBe("-12.5");
+    expect(inspect({ amount: new BigintDecimal("0.1") })).toBe("{ amount: 0.1 }");
+  });
+
+  it('copies another instance without sharing state', () => {
+    const original = new BigintDecimal("1.25");
+    const copy = new BigintDecimal(original);
+    expect(copy).not.toBe(original);
+    expect(copy.eq(original)).toBe(true);
+    expect(new BigintDecimal(new BigintDecimalBase("3.5")).toString()).toBe("3.5");
+  });
+});
+
+describe('Arithmetic conditions', () => {
+  it('signs and zero in every combination', () => {
+    const values = ["-2.5", "-1", "0", "1", "2.5"];
+    for (const a of values) for (const b of values) {
+      const x = Number(a), y = Number(b);
+      expect(Number(new BigintDecimal(a).plus(b).toString())).toBe(x + y);
+      expect(Number(new BigintDecimal(a).minus(b).toString())).toBe(x - y);
+      expect(Number(new BigintDecimal(a).times(b).toString())).toBe(x * y === 0 ? 0 : x * y);
+      if (y !== 0) expect(Number(new BigintDecimal(a).div(b).toString())).toBe(x / y === 0 ? 0 : x / y);
+      expect(new BigintDecimal(a).gt(b)).toBe(x > y);
+      expect(new BigintDecimal(a).eq(b)).toBe(x === y);
+    }
+  });
+
+  it('results are trimmed and never "-0"', () => {
+    expect(new BigintDecimal("1.10").plus("0.90").toString()).toBe("2");
+    expect(new BigintDecimal("-0.5").plus("0.5").toString()).toBe("0");
+    expect(new BigintDecimal("-0.001").round(2).toString()).toBe("0");
+    expect(new BigintDecimal("-1").times(0).toString()).toBe("0");
+    expect(new BigintDecimal("0").div("-3").toString()).toBe("0");
+  });
+
+  it('round() handles every position and sign', () => {
+    expect(new BigintDecimal("1.005").round(2).toString()).toBe("1.01");
+    expect(new BigintDecimal("-1.005").round(2).toString()).toBe("-1.01");
+    expect(new BigintDecimal("1.004999").round(2).toString()).toBe("1");
+    expect(new BigintDecimal("9.995").round(2).toString()).toBe("10");
+    expect(new BigintDecimal("0.5").round(0).toString()).toBe("1");
+    expect(new BigintDecimal("-0.5").round(0).toString()).toBe("-1");
+    expect(new BigintDecimal("1.5").round(5).toString()).toBe("1.5");
+    expect(new BigintDecimal("12").round(0).toString()).toBe("12");
+  });
+
+  it('div by zero in every form throws', () => {
+    for (const zero of [0, "0", "0.000", 0n, "-0", new BigintDecimal(0)]) {
+      expect(() => new BigintDecimal(1).div(zero)).toThrow("Division by zero");
+    }
+  });
+
+  it('div with more decimals than the precision', () => {
+    expect(new BigintDecimal("0.000000000000000000000000001").div("1").toString()).toBe("0");
+    expect(new BigintDecimal("1").div("0.000000000000000000000000001").toString()).toBe("1000000000000000000000000000");
+  });
+
+  it('instance precision overrides the global precision for div', () => {
+    const x = new BigintDecimal(2);
+    x.setPrecision(4);
+    expect(x.div(3).toString()).toBe("0.6666");
+    expect(new BigintDecimal(2).div(3).toString()).toBe("0.66666666666666666666");
+  });
+
+  it('serializes to JSON as a string', () => {
+    expect(JSON.stringify([new BigintDecimal("-0.10"), new BigintDecimal(5n)])).toBe('["-0.1","5"]');
+  });
+});
+
+describe('Precision and decimal-place arguments are validated', () => {
+  const invalid = [-1, 2.5, NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1];
+
+  it.each(invalid)('setPrecisionGlobal(%p) throws and keeps the old setting', (value) => {
+    BigintDecimal.setPrecisionGlobal(7);
+    expect(() => BigintDecimal.setPrecisionGlobal(value)).toThrow(RangeError);
+    expect(BigintDecimalBase.precision).toBe(7);
+    expect(new BigintDecimal(1).div(3).toString()).toBe("0.3333333");
+    BigintDecimal.setPrecisionGlobal(20);
+  });
+
+  it.each(invalid)('setPrecision(%p) throws and keeps the old setting', (value) => {
+    const x = new BigintDecimal(1);
+    x.setPrecision(4);
+    expect(() => x.setPrecision(value)).toThrow(RangeError);
+    expect(x.div(3).toString()).toBe("0.3333");
+  });
+
+  it.each(invalid)('round(%p) throws', (value) => {
+    expect(() => new BigintDecimal("123.456").round(value)).toThrow(RangeError);
+  });
+
+  it('accepts 0 and large whole numbers', () => {
+    BigintDecimal.setPrecisionGlobal(0);
+    expect(new BigintDecimal(7).div(2).toString()).toBe("3");
+    BigintDecimal.setPrecisionGlobal(500);
+    expect(new BigintDecimal(1).div(3).toString()).toBe("0." + "3".repeat(500));
+    BigintDecimal.setPrecisionGlobal(20);
+    expect(new BigintDecimal("123.456").round(0).toString()).toBe("123");
+  });
+});
+
+describe('Package build', () => {
+  it('relative imports end in ".js" (Node\'s ESM loader needs the extension)', () => {
+    // compiled tests run from dist/test/test, the sources are three levels up
+    for (const file of ["index.ts", "bigintDecimalBase.ts"]) {
+      const source = readFileSync(join(__dirname, "..", "..", "..", file), "utf8");
+      const relativeImports = [...source.matchAll(/from\s+["'](\.[^"']*)["']/g)].map((match) => match[1] ?? "");
+      for (const path of relativeImports) expect(path.endsWith(".js")).toBe(true);
+    }
   });
 });
