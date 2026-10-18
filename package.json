@@ -10,6 +10,7 @@
     "build": "npm run clean && tsc --project tsconfig.common.json && tsc --project tsconfig.global.json",
     "dev": "tsc -w --project tsconfig.common.json & tsc -w --project tsconfig.global.json & node --watch --watch-preserve-output ./dist/common/index.js",
     "test": "tsc --project tsconfig.test.json &&   jest ./dist/test && rm -rf ./dist/test",
+    "bench": "tsc --project tsconfig.bench.json && node ./dist/bench/benchmark/benchmark.js && rm -rf ./dist/bench",
     "prepublishOnly": "npm run test && npm run build"
   },
   "publishConfig": {
@@ -40,8 +41,13 @@
     "bignumber"
   ],
   "devDependencies": {
+    "@jest/types": "^30.3.0",
+    "@types/big.js": "^7.0.0",
+    "big.js": "^7.0.1",
+    "bignumber.js": "^11.1.5",
+    "decimal.js": "^10.6.0",
     "jest": "^30.3.0",
-    "typescript": "^7.0.2",
-    "@jest/types": "^30.3.0"
+    "tinybench": "^6.2.2",
+    "typescript": "^7.0.2"
   }
 }

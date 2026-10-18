@@ -20,7 +20,8 @@
   "exclude": [
     "./dist/",
     "node_modules",
-    "./test"
+    "./test",
+    "./benchmark"
   ],
   "include": [
     "./**/*"

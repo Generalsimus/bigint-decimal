@@ -426,3 +426,24 @@ describe('Package build', () => {
     }
   });
 });
+
+describe('Trailing zeros', () => {
+  it('exact results at high precision are trimmed correctly and quickly', () => {
+    // 1/8 at 20000 digits has ~20000 trailing zeros; removing them one at a time took ~0.9 s here
+    BigintDecimal.setPrecisionGlobal(20000);
+    const start = performance.now();
+    for (let i = 0; i < 5; i++) {
+      expect(new BigintDecimal(1).div(8).toString()).toBe("0.125");
+      expect(BigintDecimal.sqrt("4").toString()).toBe("2");
+    }
+    expect(performance.now() - start).toBeLessThan(400);
+    BigintDecimal.setPrecisionGlobal(20);
+  });
+
+  it('only zeros after the dot are removed', () => {
+    expect(new BigintDecimal("1000").toString()).toBe("1000");
+    expect(new BigintDecimal("1000.000").toString()).toBe("1000");
+    expect(new BigintDecimal("-120.0500").toString()).toBe("-120.05");
+    expect(new BigintDecimal("0." + "0".repeat(5000) + "1" + "0".repeat(3000)).toString()).toBe("0." + "0".repeat(5000) + "1");
+  });
+});

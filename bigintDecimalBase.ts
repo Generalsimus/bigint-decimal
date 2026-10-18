@@ -59,15 +59,28 @@ export class BigintDecimalBase {
         return result.trim();
     }
 
+    // Removes trailing zeros after the dot: 1.500 -> 1.5
     protected trim(): this {
         if (this.value === 0n) {
-            this.value = 0n
             this.decimals = 0;
+            return this;
         }
-        // While we have decimals AND the last digit is 0
-        while (this.decimals > 0 && this.value !== 0n && this.value % 10n === 0n) {
-            this.value /= 10n; // Shrink the number
-            this.decimals--;    // Shrink the scale
+        // Most values have no or only a few trailing zeros: remove those one digit at a time
+        for (let i = 0; i < 8; i++) {
+            if (this.decimals === 0 || this.value % 10n !== 0n) return this;
+            this.value /= 10n;
+            this.decimals--;
+        }
+
+        // Many zeros: strip them in chunks of 2^k digits, largest first. An exact result like
+        // 1/8 at 1000 digits has ~1000 zeros, and removing them one by one costs 1000 big divisions.
+        const chunks: [size: number, power: bigint][] = []; // largest first: ..., [4, 10^4], [2, 10^2], [1, 10]
+        for (let size = 1, power = 10n; size <= this.decimals; size *= 2, power *= power) chunks.unshift([size, power]);
+        for (const [size, power] of chunks) {
+            if (size <= this.decimals && this.value % power === 0n) {
+                this.value /= power;
+                this.decimals -= size;
+            }
         }
         return this;
     }
